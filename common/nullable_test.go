@@ -159,3 +159,16 @@ func TestNewValidatorErrorMessages(t *testing.T) {
 	asserts.Equal([]string{"is invalid"}, bindErrs(`{"email":"nope"}`).Errors["email"],
 		"tags without a specific message should fall back to is invalid")
 }
+
+// Covers QP-SMGIN-3-2: a too-short bound field reports its own minimum.
+func TestBoundFieldTooShortReportsOwnMinimum(t *testing.T) {
+	asserts := assert.New(t)
+
+	type form struct {
+		Name Nullable[string] `json:"name" binding:"omitnil,required,min=4,max=10"`
+	}
+	var f form
+	errs := NewValidatorError(binding.JSON.BindBody([]byte(`{"name":"abc"}`), &f))
+
+	asserts.Equal([]string{"is too short (minimum is 4 characters)"}, errs.Errors["name"])
+}
