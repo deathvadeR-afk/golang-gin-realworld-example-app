@@ -838,3 +838,20 @@ func TestUsersRegistrationEmailRaceConflict(t *testing.T) {
 	asserts.Equal(http.StatusConflict, w.Code, "losing the insert race should return 409")
 	asserts.Contains(w.Body.String(), `"email":["has already been taken"]`)
 }
+
+// Covers QP-SMGIN-3-1: a too-short registration password is reported as too short.
+func TestRegistrationReportsShortPasswordAsTooShort(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users/", bytes.NewBufferString(
+		`{"user":{"username":"wangzitian0","email":"wzt@gg.cn","password":"abc"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Contains(w.Body.String(), `"password":["is too short (minimum is 8 characters)"]`)
+}
