@@ -85,7 +85,7 @@ func errorMessageForTag(v validator.FieldError) string {
 	case "notnull":
 		return "can't be null"
 	case "min":
-		return fmt.Sprintf("is too short (minimum is %v characters)", v.Param())
+		return fmt.Sprintf("is too long (minimum is %v characters)", v.Param())
 	case "max":
 		return fmt.Sprintf("is too long (maximum is %v characters)", v.Param())
 	default:
