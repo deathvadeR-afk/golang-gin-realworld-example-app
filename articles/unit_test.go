@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -1983,3 +1984,47 @@ func TestArticleUpdateSlugRaceRetries(t *testing.T) {
 	asserts.Equal(http.StatusOK, w.Code, "update should succeed after the retry")
 	asserts.Contains(w.Body.String(), `"slug":"`+newSlug)
 }
+
+// Excerpt helper tests: they call excerpt on a plain string, with no database
+// connection and no server started.
+func TestExcerptHelper(t *testing.T) {
+	t.Run("[QP-SMGIN-10-1] Collapses whitespace and newlines and trims the ends of the body", func(t *testing.T) {
+		asserts := assert.New(t)
+		asserts.Equal("Hello world", excerpt("  Hello\n\nworld  "))
+	})
+
+	t.Run("[QP-SMGIN-10-2] Returns a 160-character body unchanged with no ellipsis", func(t *testing.T) {
+		asserts := assert.New(t)
+		body := strings.Repeat("abcdefghi ", 15) + "abcdefghij"
+		asserts.Len(body, 160)
+		asserts.Equal(body, excerpt(body))
+	})
+
+	t.Run("[QP-SMGIN-10-3] Shortens a 400-character body of 9-letter words to 15 whole words and an ellipsis", func(t *testing.T) {
+		asserts := assert.New(t)
+		body := strings.Repeat("abcdefghi ", 40)
+		asserts.Len(body, 400)
+		want := strings.Repeat("abcdefghi ", 14) + "abcdefghi..."
+		asserts.Len(want, 152)
+		asserts.Equal(want, excerpt(body))
+	})
+
+	t.Run("[QP-SMGIN-10-4] Shortens a 161-character body, since it is over the limit", func(t *testing.T) {
+		asserts := assert.New(t)
+		body := strings.Repeat("abcdefghi ", 15) + "abcdefghijx"
+		asserts.Len(body, 161)
+		want := strings.Repeat("abcdefghi ", 14) + "abcdefghi..."
+		asserts.Equal(want, excerpt(body))
+	})
+
+	t.Run("[QP-SMGIN-10-5] Runs as a unit test in the articles package with no database or server", func(t *testing.T) {
+		asserts := assert.New(t)
+		asserts.Equal("Hello world", excerpt("  Hello\n\nworld  "))
+	})
+
+	t.Run("[QP-SMGIN-10-6] Returns the empty string for a body that is only whitespace", func(t *testing.T) {
+		asserts := assert.New(t)
+		asserts.Equal("", excerpt(" \n  \n \n"))
+	})
+}
+
