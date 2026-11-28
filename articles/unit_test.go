@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"strings"
 )
 
 var test_db *gorm.DB
@@ -1982,4 +1983,49 @@ func TestArticleUpdateSlugRaceRetries(t *testing.T) {
 	asserts.True(raced, "the simulated concurrent insert should have run")
 	asserts.Equal(http.StatusOK, w.Code, "update should succeed after the retry")
 	asserts.Contains(w.Body.String(), `"slug":"`+newSlug)
+}
+
+// Excerpt helper tests (QP-SMGIN-9-1 to QP-SMGIN-9-6).
+func TestExcerptCollapsesWhitespaceAndTrims(t *testing.T) {
+	asserts := assert.New(t)
+	asserts.Equal("Hello world", excerpt("  Hello\n\nworld  "))
+}
+
+func TestExcerptShortBodyUnchanged(t *testing.T) {
+	asserts := assert.New(t)
+	got := excerpt("Hello world")
+	asserts.Equal("Hello world", got)
+	asserts.False(strings.HasSuffix(got, "..."))
+}
+
+func TestExcerptCapsLongBodyWithEllipsis(t *testing.T) {
+	asserts := assert.New(t)
+	body := strings.Repeat("abcdefghi ", 40)
+	got := excerpt(body)
+	asserts.LessOrEqual(len(got), 160)
+	asserts.True(strings.HasSuffix(got, "..."))
+}
+
+func TestExcerptCutsAfterCompleteWord(t *testing.T) {
+	asserts := assert.New(t)
+	body := strings.Repeat("abcdefghi ", 40)
+	got := excerpt(body)
+	words := strings.Fields(strings.TrimSuffix(got, "..."))
+	asserts.NotEmpty(words)
+	asserts.Equal("abcdefghi", words[len(words)-1])
+}
+
+func TestExcerptKeepsExactly160CharBody(t *testing.T) {
+	asserts := assert.New(t)
+	body := strings.Repeat("abcdefghi ", 15) + "abcdefghij"
+	asserts.Equal(160, len(body))
+	got := excerpt(body)
+	asserts.Equal(body, got)
+	asserts.Equal(160, len(got))
+	asserts.False(strings.HasSuffix(got, "..."))
+}
+
+func TestExcerptRunsWithoutDatabaseOrServer(t *testing.T) {
+	asserts := assert.New(t)
+	asserts.Equal("Hello world", excerpt("  Hello\n\nworld  "))
 }
