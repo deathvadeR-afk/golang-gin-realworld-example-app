@@ -159,3 +159,14 @@ func TestNewValidatorErrorMessages(t *testing.T) {
 	asserts.Equal([]string{"is invalid"}, bindErrs(`{"email":"nope"}`).Errors["email"],
 		"tags without a specific message should fall back to is invalid")
 }
+
+func TestNewValidatorErrorTooShortMessageForMinLength(t *testing.T) {
+	asserts := assert.New(t)
+
+	type form struct {
+		Name string `json:"name" binding:"min=4"`
+	}
+	var f form
+	errs := NewValidatorError(binding.JSON.BindBody([]byte(`{"name":"abc"}`), &f))
+	asserts.Equal([]string{"is too short (minimum is 4 characters)"}, errs.Errors["name"])
+}

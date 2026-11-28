@@ -838,3 +838,38 @@ func TestUsersRegistrationEmailRaceConflict(t *testing.T) {
 	asserts.Equal(http.StatusConflict, w.Code, "losing the insert race should return 409")
 	asserts.Contains(w.Body.String(), `"email":["has already been taken"]`)
 }
+
+func TestUsersRegistrationShortPasswordReportedAsTooShort(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users", bytes.NewBufferString(
+		`{"user":{"username":"validuser","email":"validuser@example.com","password":"abc"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Equal(http.StatusUnprocessableEntity, w.Code, "three-character password should be rejected")
+	asserts.Contains(w.Body.String(), `"password":["is too short (minimum is 8 characters)"]`)
+	asserts.NotContains(w.Body.String(), "is too long", "a too-short password must not be reported as too long")
+}
+
+func TestUsersRegistrationShortUsernameReportedAsTooShort(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users", bytes.NewBufferString(
+		`{"user":{"username":"u","email":"shortuser@example.com","password":"password123"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Equal(http.StatusUnprocessableEntity, w.Code, "one-character username should be rejected")
+	asserts.Contains(w.Body.String(), `"username":["is too short (minimum is 4 characters)"]`)
+}
