@@ -838,3 +838,40 @@ func TestUsersRegistrationEmailRaceConflict(t *testing.T) {
 	asserts.Equal(http.StatusConflict, w.Code, "losing the insert race should return 409")
 	asserts.Contains(w.Body.String(), `"email":["has already been taken"]`)
 }
+
+// Case QP-SMGIN-8-1: a password of 3 characters is reported as too short
+// against the password minimum of 8.
+func TestQPSMGIN81PasswordTooShortIsReportedAsTooShort(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users", bytes.NewBufferString(
+		`{"user":{"username":"shortpwuser","email":"shortpw@example.com","password":"abc"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Contains(w.Body.String(), `"password":["is too short (minimum is 8 characters)"]`, "password error should read too short")
+}
+
+// Case QP-SMGIN-8-2: a username shorter than its minimum of 4 is reported as
+// too short with that field's minimum, and not as too long.
+func TestQPSMGIN82UsernameTooShortIsReportedAsTooShort(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users", bytes.NewBufferString(
+		`{"user":{"username":"u","email":"shortuser@example.com","password":"jakejxke"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Contains(w.Body.String(), `"username":["is too short (minimum is 4 characters)"]`, "username error should read too short with minimum 4")
+	asserts.NotContains(w.Body.String(), "is too long", "username error should not say too long")
+}
