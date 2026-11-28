@@ -139,3 +139,24 @@ func Bind(c *gin.Context, obj interface{}) error {
 	b := binding.Default(c.Request.Method, c.ContentType())
 	return c.ShouldBindWith(obj, b)
 }
+
+// Excerpt collapses every run of whitespace in body to a single space and trims
+// the ends. Text longer than 160 characters is cut at the last whole word that
+// still fits within 160 characters once "..." is appended.
+func Excerpt(body string) string {
+	const maxLen = 160
+	const ellipsis = "..."
+	text := strings.Join(strings.Fields(body), " ")
+	if len(text) <= maxLen {
+		return text
+	}
+	limit := maxLen - len(ellipsis)
+	for k := limit; k > 0; k-- {
+		if text[k] == ' ' {
+			return text[:k] + ellipsis
+		}
+	}
+	// The first word alone is longer than the limit; the request does not say
+	// what to return here, so this is a plain cut to the limit.
+	return text[:limit] + ellipsis
+}
