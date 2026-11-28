@@ -838,3 +838,41 @@ func TestUsersRegistrationEmailRaceConflict(t *testing.T) {
 	asserts.Equal(http.StatusConflict, w.Code, "losing the insert race should return 409")
 	asserts.Contains(w.Body.String(), `"email":["has already been taken"]`)
 }
+
+// [QP-SMGIN-6-1] A registration with a 3-character password must report the
+// minimum-length rule as "too short", not as "too long".
+func TestRegistrationShortPasswordReportedAsTooShort(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users", bytes.NewBufferString(
+		`{"user":{"username":"shortpwuser","email":"shortpw@example.com","password":"abc"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Equal(http.StatusUnprocessableEntity, w.Code, "short password should be rejected")
+	asserts.Contains(w.Body.String(), `"password":["is too short (minimum is 8 characters)"]`, "password error should be exactly the too-short message")
+}
+
+// [QP-SMGIN-6-2] A registration with a username shorter than the username
+// minimum (4 characters) must report "too short" with that minimum.
+func TestRegistrationShortUsernameReportedWithMinimum(t *testing.T) {
+	asserts := assert.New(t)
+
+	r := gin.New()
+	UsersRegister(r.Group("/users"))
+	resetDBWithMock()
+
+	req, _ := http.NewRequest("POST", "/users", bytes.NewBufferString(
+		`{"user":{"username":"abc","email":"shortuser@example.com","password":"password123"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	asserts.Equal(http.StatusUnprocessableEntity, w.Code, "short username should be rejected")
+	asserts.Contains(w.Body.String(), `"username":["is too short (minimum is 4 characters)"]`, "username error should be exactly the too-short message with minimum 4")
+}
