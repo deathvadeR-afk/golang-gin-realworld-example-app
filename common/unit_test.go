@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -365,4 +366,38 @@ func TestDatabaseWithCurrentDirectory(t *testing.T) {
 	// Clean up
 	sqlDB.Close()
 	os.Remove("test_simple.db")
+}
+
+func TestExcerptCollapsesWhitespaceAndNewlines(t *testing.T) {
+	asserts := assert.New(t)
+
+	got := Excerpt("  Hello\n\nworld  ")
+	asserts.Equal("Hello world", got, "Excerpt should collapse whitespace and newlines to single spaces")
+	asserts.NotContains(got, "...", "Short excerpt should have no ellipsis")
+}
+
+func TestExcerptCapsLongBodyAt160WithEllipsis(t *testing.T) {
+	asserts := assert.New(t)
+
+	body := strings.Repeat("abcdefghi ", 40)
+	asserts.Len(body, 400, "Test body should be 400 characters")
+	got := Excerpt(body)
+	asserts.LessOrEqual(len(got), 160, "Excerpt should be at most 160 characters")
+	asserts.True(strings.HasSuffix(got, "..."), "Excerpt should end with an ellipsis")
+}
+
+func TestExcerptCutsOnlyAtWholeWordBoundary(t *testing.T) {
+	asserts := assert.New(t)
+
+	body := strings.Repeat("abcdefghi ", 40)
+	text := strings.TrimSuffix(Excerpt(body), "...")
+	for _, word := range strings.Split(text, " ") {
+		asserts.Equal("abcdefghi", word, "Every word before the ellipsis should be a complete 9-letter word")
+	}
+}
+
+func TestExcerptRunsAsPlainUnitTest(t *testing.T) {
+	asserts := assert.New(t)
+
+	asserts.Equal("Hello world", Excerpt("  Hello\n\nworld  "), "Excerpt should return the collapsed text")
 }
